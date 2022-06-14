@@ -7,9 +7,15 @@ import com.github.thetallman67.gemini.v1.response.SymbolDetails;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 public class PublicClientTest {
+
+    final Set<String> QUOTE_CURRENCIES = new HashSet<>(Arrays.asList("btc", "eth", "usd", "eur", "gbp", "dai", "ltc", "bch", "sgd"));
 
     private static PublicClient publicClient;
 
@@ -18,6 +24,17 @@ public class PublicClientTest {
         publicClient = Gemini.publicClient()
                                 .useSandbox()
                                 .build();
+    }
+
+    @Test
+    public void testGetSymbols() {
+        Set<String> symbols = publicClient.getSymbols();
+        assertNotNull(symbols);
+        assertTrue(symbols.size() >= 118);
+        assertTrue(symbols.contains("btcusd"));
+        symbols.forEach(s -> {
+            assertTrue(QUOTE_CURRENCIES.stream().anyMatch(s::endsWith));
+        });
     }
 
     @Test
