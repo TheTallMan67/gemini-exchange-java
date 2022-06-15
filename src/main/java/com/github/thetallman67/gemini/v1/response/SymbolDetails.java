@@ -4,7 +4,7 @@ import com.github.thetallman67.gemini.v1.model.SymbolStatus;
 import lombok.Getter;
 
 @Getter
-public class SymbolDetails {
+public class SymbolDetails extends GeminiResponse {
     private String symbol;
     private String baseCurrency;
     private String quoteCurrency;

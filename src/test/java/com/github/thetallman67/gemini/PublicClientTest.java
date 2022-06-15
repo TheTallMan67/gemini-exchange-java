@@ -4,9 +4,13 @@ import com.github.thetallman67.gemini.v1.client.PublicClient;
 import com.github.thetallman67.gemini.v1.model.SymbolStatus;
 import com.github.thetallman67.gemini.v1.request.SymbolRequest;
 import com.github.thetallman67.gemini.v1.response.SymbolDetails;
+import com.github.thetallman67.gemini.v1.response.Ticker;
+import kong.unirest.UnirestException;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -19,6 +23,10 @@ public class PublicClientTest {
 
     private static PublicClient publicClient;
 
+    final String BASE_CURRENCY = "BTC";
+    final String QUOTE_CURRENCY = "USD";
+    final String SYMBOL = BASE_CURRENCY + QUOTE_CURRENCY;
+
     @BeforeAll
     public static void setup() {
         publicClient = Gemini.publicClient()
@@ -30,7 +38,8 @@ public class PublicClientTest {
     public void testGetSymbols() {
         Set<String> symbols = publicClient.getSymbols();
         assertNotNull(symbols);
-        assertTrue(symbols.size() >= 118);
+        final int EXPECTED_SYMBOL_COUNT = publicClient.isSandbox() ? 119 : 131;
+        assertTrue(symbols.size() >= EXPECTED_SYMBOL_COUNT, "Expected " + EXPECTED_SYMBOL_COUNT + " symbols but found " + symbols.size() + "");
         assertTrue(symbols.contains("btcusd"));
         symbols.forEach(s -> {
             assertTrue(QUOTE_CURRENCIES.stream().anyMatch(s::endsWith));
@@ -39,10 +48,6 @@ public class PublicClientTest {
 
     @Test
     public void testGetSymbolDetails() {
-        final String BASE_CURRENCY = "BTC";
-        final String QUOTE_CURRENCY = "USD";
-        final String SYMBOL = BASE_CURRENCY + QUOTE_CURRENCY;
-
         SymbolDetails symbolDetails = publicClient.getSymbolDetails(
                 SymbolRequest.builder().withSymbol(SYMBOL).build()
         );
@@ -55,5 +60,35 @@ public class PublicClientTest {
         assertEquals("0.00001", symbolDetails.getMinOrderSize());
         assertEquals(SymbolStatus.OPEN, symbolDetails.getStatus());
         assertFalse(symbolDetails.isWrapEnabled());
+    }
+
+    @Test
+    public void testGetTickerBadSymbol() {
+        final String BAD_SYMBOL = "BTCETH";
+        UnirestException e = assertThrows(UnirestException.class, () -> {
+            Ticker ticker = publicClient.getTicker(
+                    SymbolRequest.builder().withSymbol(BAD_SYMBOL).build()
+            );
+        }, "UnirestException was expected");
+
+        assertEquals("kong.unirest.UnirestException: Supplied value '" + BAD_SYMBOL + "' is not a valid symbol", e.getMessage());
+    }
+
+    @Test
+    public void testGetTicker() {
+        Ticker ticker = publicClient.getTicker(
+                SymbolRequest.builder().withSymbol(SYMBOL).build()
+        );
+        assertNotNull(ticker);
+        assertTrue(ticker.getBid() > 0);
+        assertTrue(ticker.getAsk() > 0);
+        assertTrue(ticker.getAsk() >= ticker.getBid());
+        assertNotNull(ticker.getVolume());
+        assertEquals(BASE_CURRENCY, ticker.getVolume().getPriceCurrencySymbol());
+        assertNotNull(ticker.getVolume().getPriceVolume());
+        assertEquals(QUOTE_CURRENCY, ticker.getVolume().getQuantityCurrencySymbol());
+        assertNotNull(ticker.getVolume().getQuantityVolume());
+        Instant fiveMinutesAgo = Instant.now().minus(5, ChronoUnit.MINUTES);
+        assertTrue(fiveMinutesAgo.toEpochMilli() <=  ticker.getVolume().getTimestampms());
     }
 }
